@@ -1,0 +1,260 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Snap a quick photo</title>
+
+<style>
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #fff4f8;
+  color: #493943;
+  text-align: center;
+}
+
+header {
+  padding: 35px 15px 15px;
+}
+
+h1 {
+  color: #d77da5;
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+.subtitle {
+  color: #987987;
+  font-size: 13px;
+  letter-spacing: 3px;
+}
+
+main {
+  max-width: 440px;
+  margin: auto;
+  padding: 15px;
+}
+
+.panel {
+  background: white;
+  border-radius: 22px;
+  padding: 20px;
+  margin: 15px 0;
+  box-shadow: 0 5px 20px #e8cbd8;
+}
+
+button, .upload {
+  display: inline-block;
+  border: none;
+  border-radius: 30px;
+  background: #e99cbd;
+  color: white;
+  padding: 13px 22px;
+  margin: 6px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+button:hover, .upload:hover {
+  background: #d77da5;
+}
+
+video {
+  width: 100%;
+  border-radius: 15px;
+  background: #eee;
+}
+
+#strip {
+  width: 220px;
+  max-width: 100%;
+  margin: 20px auto;
+  background: white;
+  padding: 12px;
+  border: 3px solid #f1bad0;
+}
+
+#strip canvas {
+  width: 100%;
+  display: block;
+}
+
+input[type=file] {
+  display: none;
+}
+
+.small {
+  font-size: 12px;
+  color: #987987;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>♡ Snap a quick photo ♡</h1>
+  <div class="subtitle">YOUR LITTLE PHOTO BOOTH</div>
+</header>
+
+<main>
+
+<div class="panel">
+  <h3>Welcome to my photo booth!</h3>
+  <p>Take four cute pictures and create your own photo strip.</p>
+  <button onclick="startCamera()">Start Camera</button>
+  <button onclick="document.getElementById('upload').click()">
+    Upload Photos
+  </button>
+  <input id="upload" type="file" accept="image/*" multiple>
+</div>
+
+<div class="panel">
+  <h3>📸 Take your photos</h3>
+  <video id="video" autoplay playsinline></video>
+  <p id="status">Camera is not started yet.</p>
+  <button onclick="takePhoto()">Take Photo</button>
+  <p class="small">Take 4 photos to complete your photo strip.</p>
+</div>
+
+<div class="panel">
+  <h3>Your Photo Strip ♡</h3>
+  <p id="count">0 / 4 photos</p>
+
+  <div id="strip">
+    <canvas id="result" width="600" height="1400"></canvas>
+  </div>
+
+  <button onclick="downloadPhoto()">Download Photo</button>
+  <button onclick="resetPhotos()">Start Again</button>
+</div>
+
+<p class="small">Made with love ♡ Snap a quick photo</p>
+
+</main>
+
+<script>
+const video = document.getElementById("video");
+const canvas = document.getElementById("result");
+const ctx = canvas.getContext("2d");
+const statusText = document.getElementById("status");
+
+let photos = [];
+
+async function startCamera() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "user" },
+      audio: false
+    });
+    video.srcObject = stream;
+    statusText.textContent = "Camera is ready! ♡";
+  } catch (error) {
+    statusText.textContent =
+      "Camera unavailable. Please allow camera permission or upload photos.";
+  }
+}
+
+function takePhoto() {
+  if (!video.srcObject || video.videoWidth === 0) {
+    alert("Please start the camera first!");
+    return;
+  }
+
+  if (photos.length >= 4) {
+    alert("You already have 4 photos!");
+    return;
+  }
+
+  const temp = document.createElement("canvas");
+  temp.width = video.videoWidth;
+  temp.height = video.videoHeight;
+
+  const c = temp.getContext("2d");
+  c.translate(temp.width, 0);
+  c.scale(-1, 1);
+  c.drawImage(video, 0, 0);
+
+  photos.push(temp);
+  renderStrip();
+}
+
+document.getElementById("upload").addEventListener("change", function(e) {
+  const files = Array.from(e.target.files).slice(0, 4 - photos.length);
+
+  files.forEach(file => {
+    const img = new Image();
+    img.onload = () => {
+      if (photos.length < 4) {
+        photos.push(img);
+        renderStrip();
+      }
+      URL.revokeObjectURL(img.src);
+    };
+    img.src = URL.createObjectURL(file);
+  });
+
+  e.target.value = "";
+});
+
+function renderStrip() {
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, 600, 1400);
+
+  photos.forEach((photo, index) => {
+    const x = 30;
+    const y = 30 + index * 335;
+    const w = 540;
+    const h = 300;
+
+    const scale = Math.max(w / photo.width, h / photo.height);
+    const sw = photo.width * scale;
+    const sh = photo.height * scale;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x, y, w, h);
+    ctx.clip();
+    ctx.drawImage(photo,
+      x + (w - sw) / 2,
+      y + (h - sh) / 2,
+      sw, sh
+    );
+    ctx.restore();
+  });
+
+  ctx.fillStyle = "#d77da5";
+  ctx.font = "bold 28px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("SNAP A QUICK PHOTO ♡", 300, 1380);
+
+  document.getElementById("count").textContent =
+    photos.length + " / 4 photos";
+}
+
+function downloadPhoto() {
+  if (photos.length !== 4) {
+    alert("Please add 4 photos first!");
+    return;
+  }
+
+  const link = document.createElement("a");
+  link.download = "snap-a-quick-photo.png";
+  link.href = canvas.toDataURL("image/png");
+  link.click();
+}
+
+function resetPhotos() {
+  photos = [];
+  renderStrip();
+}
+
+renderStrip();
+</script>
+
+</body>
+</html>
